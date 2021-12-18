@@ -1,17 +1,15 @@
 #!/bin/bash
-linkLogPath="./Links.log"
 
-useAprsIs=1 #set to 0 to not send to IS
-aprsLogin=N0CALL-Z #DO NOT USE same login as repeater call i.e. if your repeater is N0CALL-B use e.g. N0CALL-Z
-aprsPasscode=1234
-aprsIsServer="rotate.aprs2.net:14580"
+configFile=$1
 
-useAX25=0 #set to 0 to not send to AX25
-ax25FromCall=N0CALL-1 #DO NOT put letters in the SSID
-ax25DigiPath= #Set to WIDE2-1 etc, pultiple input shall be space separetd leave empty for no digipeateting
-ax25Port=APRS #Name of the port configured in /etc/ax25/axports you want to use
+if [ -f "${configFile}" ]
+then
+	. $configFile
+else
+	echo "Please sepcify config file"
+	exit 1;
+fi
 
-#No user sericeable parts below
 function parseLinkLine() {
 	local linkLine="$1"
 	local -n lorepeaterCall=$2
