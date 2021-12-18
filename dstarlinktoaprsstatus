@@ -1,0 +1,57 @@
+#!/bin/bash
+getLinkLogCommand="cat Links.log"
+aprsLogin=N0CALL-Z #DO NOT USE same login as repeater call i.e. if your repeater is N0CALL-B use e.g. N0CALL-Z
+aprsPasscode=1234
+aprsisserver="rotate.aprs2.net:14580"
+
+#No user sericeable parts below
+function parseLinkLine() {
+	local linkLine="$1"
+	local -n lorepeaterCall=$2
+	local -n loreflector=$3
+
+	local regex="[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}: (DCS|DExtra|DPlus){1} link - Type: (Repeater|Dongle) Rptr: ([0-9A-Z]{1,7}) {0,5}([A-Z]) Refl: ([0-9A-Z ]{1,7}[A-Z]) Dir: Outgoing"
+	#2021-12-18 14:09:27: DPlus link - Type: Dongle Rptr: F5ZEE  C Refl: REF084 C Dir: Outgoing
+	#2021-12-18 14:09:27: DCS link - Type: Repeater Rptr: F5ZEE  C Refl: DCS208 C Dir: Outgoing
+	if [[ $linkLine =~ $regex ]]
+	then
+		lorepeaterCall="${BASH_REMATCH[3]}-${BASH_REMATCH[4]}"
+		loreflector="${BASH_REMATCH[5]}"
+		return 0
+	fi
+	return 1
+}
+
+function sendToAPRSIS() {
+	
+	local frame="$1>APRS:$2"
+	echo $frame
+	tmpscript=`cat /dev/urandom | tr -cd 'a-f0-9' | head -c 32`
+	tmpscript="/tmp/"$tmpscript
+	logintext="user $aprsLogin pass $aprsPasscode vers DStarLinkToAprsStatus 1.0"
+	
+	echo '#!/bin/bash' > $tmpscript
+	echo "echo '$logintext'" >> $tmpscript
+	echo "sleep 2" >> $tmpscript
+	echo "echo '$frame'" >> $tmpscript
+	chmod +x $tmpscript
+	$tmpscript | socat - TCP:${aprsisserver}
+	rm -f $tmpscript	
+}
+
+
+repeaterCall=
+reflector=
+readarray -t linkLines <<< `$getLinkLogCommand`
+#declare -p linkLines
+
+for linkLine in "${linkLines[@]}"
+do
+	parseLinkLine "${linkLine}" repeaterCall reflector
+	parseOk=$?
+	if [ "$parseOk" -eq 0 ]
+	then
+		statusFrame=">$repeaterCall linked to $reflector"
+		sendToAPRSIS "${repeaterCall}" "${statusFrame}"
+	fi
+done
