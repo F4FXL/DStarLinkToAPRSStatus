@@ -88,24 +88,6 @@ function main() {
 	while read -r filename event; do
 		sendStatus
 	done
-
-
-	# while [ 1 ]
-	# do
-	# 	newFileContent=$($getLinkLogCommand)
-	# 	if [[ "$prevFileContent" == "$snewFileContent" ]]
-	# 	then
-	# 		echo "No link change"
-	# 	else
-	# 		sendStatus
-	# 		echo $prevFileContent
-	# 		echo $newFileContent
-	# 		prevFileContent=$newFileContent
-	# 	fi
-
-	# 	sleep 10
-	# done
 }
 
-# trap killBackgroundAndExit HUP INT TERM
 main
