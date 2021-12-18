@@ -2,7 +2,11 @@
 getLinkLogCommand="cat Links.log"
 aprsLogin=N0CALL-Z #DO NOT USE same login as repeater call i.e. if your repeater is N0CALL-B use e.g. N0CALL-Z
 aprsPasscode=1234
-aprsisserver="rotate.aprs2.net:14580"
+aprsIsServer="rotate.aprs2.net:14580"
+
+ax25FromCall=N0CALL-1 #DO NOT put letters in the SSID
+ax25DigiPath= #Set to WIDE2-1 etc, pultiple input shall be space separetd leave empty for no digipeateting
+ax25Port=APRS #Name of the port configured in /etc/ax25/axports you want to use
 
 #No user sericeable parts below
 function parseLinkLine() {
@@ -24,7 +28,7 @@ function parseLinkLine() {
 
 function sendToAPRSIS() {
 	
-	local frame="$1>APRS:$2"
+	local frame="$1>DSTAR:$2"
 	echo $frame
 	tmpscript=`cat /dev/urandom | tr -cd 'a-f0-9' | head -c 32`
 	tmpscript="/tmp/"$tmpscript
@@ -35,8 +39,14 @@ function sendToAPRSIS() {
 	echo "sleep 2" >> $tmpscript
 	echo "echo '$frame'" >> $tmpscript
 	chmod +x $tmpscript
-	$tmpscript | socat - TCP:${aprsisserver}
+	$tmpscript | socat - TCP:${aprsIsServer}
 	rm -f $tmpscript	
+}
+
+function sendToAX25() {
+	#make it a third party frame to accomodate for letters in SSID
+	local frame="}$1>DSTAR,TCPIP,$ax25FromCall:$2"
+	/usr/sbin/beacon -c ax25FromCall -d "APRS $ax25DigiPath" -s $ax25Port $frame
 }
 
 
@@ -53,5 +63,6 @@ do
 	then
 		statusFrame=">$repeaterCall linked to $reflector"
 		sendToAPRSIS "${repeaterCall}" "${statusFrame}"
+		sendToAX25 "${repeaterCall}" "${statusFrame}"
 	fi
 done
