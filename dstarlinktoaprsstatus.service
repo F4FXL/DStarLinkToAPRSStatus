@@ -1,0 +1,13 @@
+
+[Unit]
+Description=DStar Link to APRS Status
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/tmux new-session -d -s dstarlinktoaprsstatus '/usr/local/bin/dstarlinktoaprsstatus /usr/local/etc/dstarlinktoaprsstatus.conf'
+
+[Install]
+WantedBy=default.target
+
+
