@@ -1,8 +1,8 @@
 #makefile for ax25systemd
 .PHONY prerequisites:
 prerequisites:
-	#@apt update
-	#@apt -y install ax25-tools ax25-apps inotify-tools socat tmux
+	@apt update
+	@apt -y install ax25-tools ax25-apps inotify-tools socat tmux
 
 .PHONY install:
 install: prerequisites
