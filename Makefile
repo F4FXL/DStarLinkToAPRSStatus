@@ -6,6 +6,7 @@ prerequisites:
 
 .PHONY install:
 install: prerequisites
+	@systemctl stop dstarlinktoaprsstatus.service || true
 	@/bin/cp -f "dstarlinktoaprsstatus.service" "/lib/systemd/system/"
 	@/bin/cp -f "dstarlinktoaprsstatus" "/usr/local/bin/"
 	@/bin/chmod +x "/usr/local/bin/dstarlinktoaprsstatus"
