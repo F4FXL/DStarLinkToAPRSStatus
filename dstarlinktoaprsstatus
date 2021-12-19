@@ -1,10 +1,11 @@
 #!/bin/bash
 
 configFile=$1
+repeaters=( )
 
 if [ -f "${configFile}" ]
 then
-	. $configFile
+	. "$configFile"
 else
 	echo "Please sepcify config file"
 	exit 1;
@@ -12,6 +13,9 @@ fi
 
 function parseLinkLine() {
 	local linkLine="$1"
+	local repeaterCall=${!2}
+	local parsedRepeaterCall
+	local parsedReflector
 	local -n lorepeaterCall=$2
 	local -n loreflector=$3
 
@@ -20,9 +24,14 @@ function parseLinkLine() {
 	#2021-12-18 14:09:27: DCS link - Type: Repeater Rptr: F5ZEE  B Refl: DCS208 C Dir: Outgoing
 	if [[ $linkLine =~ $regex ]]
 	then
-		lorepeaterCall="${BASH_REMATCH[3]}-${BASH_REMATCH[4]}"
-		loreflector="${BASH_REMATCH[5]}"
-		return 0
+		parsedRepeaterCall="${BASH_REMATCH[3]}-${BASH_REMATCH[4]}"
+		parsedReflector="${BASH_REMATCH[5]}"
+		if [ "$repeaterCall" = "$parsedRepeaterCall" ]
+		then 
+			lorepeaterCall="$parsedRepeaterCall"
+			loreflector="$parsedReflector"
+			return 0
+		fi
 	fi
 	return 1
 }
@@ -30,9 +39,10 @@ function parseLinkLine() {
 function sendToAPRSIS() {
 	
 	local frame="$1>DSTAR:$2"
-	echo $frame
+	# echo $frame
 	tmpscript=`cat /dev/urandom | tr -cd 'a-f0-9' | head -c 32`
 	tmpscript="/tmp/"$tmpscript
+
 	logintext="user $aprsLogin pass $aprsPasscode vers DStarLinkToAprsStatus 1.0"
 	
 	echo '#!/bin/bash' > $tmpscript
@@ -53,31 +63,74 @@ function sendToAX25() {
 function sendStatus() {
 	local repeaterCall=
 	local reflector=
+	local statusFrame=
+	local -A statusFrames
 	readarray -t linkLines <<< "`cat $linkLogPath`"
 	#declare -p linkLines
 
+	# fill staus frames with not linked frames
+	for repeaterCall in "${repeaters[@]}"
+	do
+		statusFrames["$repeaterCall"]=">$repeaterCall not linked"
+	done
+
+	# Load all frames
 	for linkLine in "${linkLines[@]}"
 	do
-		parseLinkLine "${linkLine}" repeaterCall reflector
-		parseOk=$?
-		if [ "$parseOk" -eq 0 ]
+		for repeaterCall in "${repeaters[@]}"
+		do
+			parseLinkLine "${linkLine}" repeaterCall reflector
+			parseOk=$?
+			if [ $parseOk -eq 0 ]
+			then
+				statusFrame=">$repeaterCall linked to $reflector"
+				statusFrames["$repeaterCall"]="$statusFrame"
+			fi
+		done
+	done
+
+	declare -p statusFrames
+
+	# send all frames
+	for repeaterCall in "${!statusFrames[@]}"
+	do
+		statusFrame="${statusFrames[$repeaterCall]}"
+		echo $statusFrame
+		if [ "$useAprsIs" -eq 1 ]
 		then
-			statusFrame=">$repeaterCall linked to $reflector"
-			if [ "$useAprsIs" -eq 1 ]
-			then
-				sendToAPRSIS "${repeaterCall}" "${statusFrame}"
-			fi
-			if [ "$useAX25" -eq 1 ]
-			then
-				sendToAX25 "${repeaterCall}" "${statusFrame}"
-			fi
+			sendToAPRSIS "${repeaterCall}" "${statusFrame}"
+		fi
+		if [ "$useAX25" -eq 1 ]
+		then
+			sendToAX25 "${repeaterCall}" "${statusFrame}"
 		fi
 	done
 }
 
-function killBackgroundAndExit()
-{
-	exit 1
+function parseIrcDDBGatewayConfig() {
+	# This is a dirty hack. We grep the information we need from the ircddbgateway config file and source it as bash file
+	grep -E "repeaterBand[1234]=|gatewayCallsign=" "$ircddbGatewayConfigPath" > /tmp/ircddbgatewayconfig
+	. /tmp/ircddbgatewayconfig
+	rm -f /tmp/ircddbgatewayconfig
+
+	if [ ! -z "$repeaterBand1" ]
+	then
+		repeaters+=("$gatewayCallsign-$repeaterBand1")
+	fi
+	if [ ! -z "$repeaterBand2" ]
+	then
+		repeaters+=("$gatewayCallsign-$repeaterBand2")
+	fi
+	if [ ! -z "$repeaterBand3" ]
+	then
+		repeaters+=("$gatewayCallsign-$repeaterBand3")
+	fi
+	if [ ! -z "$repeaterBand4" ]
+	then
+		repeaters+=("$gatewayCallsign-$repeaterBand4")
+	fi
+
+	# declare -p repeaters
 }
 
 function main() {
@@ -88,4 +141,5 @@ function main() {
 	done
 }
 
+parseIrcDDBGatewayConfig
 main
