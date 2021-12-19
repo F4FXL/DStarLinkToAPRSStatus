@@ -89,13 +89,13 @@ function sendStatus() {
 		done
 	done
 
-	declare -p statusFrames
+	# declare -p statusFrames
 
 	# send all frames
 	for repeaterCall in "${!statusFrames[@]}"
 	do
 		statusFrame="${statusFrames[$repeaterCall]}"
-		echo $statusFrame
+		echo "Sending status : $statusFrame"
 		if [ "$useAprsIs" -eq 1 ]
 		then
 			sendToAPRSIS "${repeaterCall}" "${statusFrame}"
@@ -133,13 +133,30 @@ function parseIrcDDBGatewayConfig() {
 	# declare -p repeaters
 }
 
-function main() {
-	sendStatus
+function waitForFileChanges() {
 	inotifywait -q -m -e close_write $linkLogPath |
-	while read -r filename event; do
+	while read -r filename event
+	do
+		echo "Link changed, sending"
 		sendStatus
 	done
 }
 
+function sendTimer() {
+	while [ 1 ]
+	do
+		sleep $(( 60*sendTimer ))
+		echo "Timer elpased, sending"
+		sendStatus
+	done
+}
+
+function main() {
+	waitForFileChanges &
+	sendTimer &
+	wait
+}
+
 parseIrcDDBGatewayConfig
+sendStatus #initially send statuses
 main
